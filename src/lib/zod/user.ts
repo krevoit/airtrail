@@ -47,7 +47,7 @@ export type UpdatePreferences = z.infer<typeof updatePreferencesSchema>;
 export const usernameSchema = z
   .string()
   .nonempty()
-  .min(3, { message: 'Username must be at least 3 characters long' })
+  .min(2, { message: 'Username must be at least 2 characters long' })
   .max(20, { message: 'Username must be at most 20 characters long' })
   .regex(/^[A-Za-z0-9._-]+$/, {
     message:
@@ -57,7 +57,7 @@ export const usernameSchema = z
 export const userSchema = z.object({
   username: usernameSchema,
   password: z.string().nonempty().min(8),
-  displayName: z.string().nonempty().min(3),
+  displayName: z.string().nonempty().min(2),
   roleId: z.string().min(1),
 });
 

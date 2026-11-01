@@ -107,7 +107,7 @@ const AirTrailFile = z.object({
     .object({
       id: z.string().min(3),
       username: usernameSchema,
-      displayName: z.string().min(3),
+      displayName: z.string().min(2),
     })
     .array()
     .min(1, 'At least one user is required'),
