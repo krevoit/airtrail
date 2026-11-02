@@ -4,3 +4,4 @@ export { default as TimeDisplay } from './TimeDisplay.svelte';
 export { default as TimeDisplayHost } from './TimeDisplayHost.svelte';
 export { default as UserAvatar } from './UserAvatar.svelte';
 export * from './time-display-tether.svelte';
+export { default as LiveryImage } from './LiveryImage.svelte';

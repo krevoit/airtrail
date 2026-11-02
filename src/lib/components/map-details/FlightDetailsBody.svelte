@@ -3,6 +3,7 @@
 
   import AircraftPhotoCard from './AircraftPhotoCard.svelte';
 
+  import { LiveryImage } from '$lib/components/display';
   import { Button } from '$lib/components/ui/button';
   import type { FlightPassenger } from '$lib/db/types';
   import { appConfig } from '$lib/state.svelte';
@@ -12,6 +13,7 @@
     toTitleCase,
     type FlightData,
   } from '$lib/utils';
+  import { formatRegistration } from '$lib/utils/registration';
   import type { Preferences } from '$lib/zod/user';
 
   let {
@@ -83,11 +85,13 @@
           label: 'Flight',
           value: flight.flightNumber,
         },
-        flight.aircraft && { label: 'Aircraft', value: flight.aircraft.name },
-        flight.aircraftReg && {
-          label: 'Registration',
-          value: flight.aircraftReg,
-        },
+        !flight.airline &&
+          flight.aircraft && { label: 'Aircraft', value: flight.aircraft.name },
+        !flight.airline &&
+          flight.aircraftReg && {
+            label: 'Registration',
+            value: formatRegistration(flight.aircraftReg),
+          },
         seatLabel && { label: 'Seat', value: seatLabel },
         you?.flightReason && {
           label: 'Reason',
@@ -107,6 +111,28 @@
 </script>
 
 <section class="flex flex-col gap-4 px-4 py-4">
+  {#if flight.airline && (flight.aircraft || flight.aircraftReg)}
+    <div
+      class="flex items-center gap-3 rounded-xl border border-border/60 bg-background/45 p-3"
+    >
+      <LiveryImage
+        airline={flight.airline}
+        aircraft={flight.aircraft}
+        registration={flight.aircraftReg}
+        scale={2}
+      />
+      <div class="min-w-0">
+        <div class="truncate text-sm font-semibold">
+          {flight.aircraft?.name ?? 'Aircraft'}
+        </div>
+        {#if flight.aircraftReg}
+          <div class="text-[12.5px] tabular-nums text-muted-foreground">
+            {formatRegistration(flight.aircraftReg)}
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
   {#if flight.aircraftReg && appConfig.config?.integrations?.aircraftPhotosEnabled}
     <AircraftPhotoCard reg={flight.aircraftReg} />
   {/if}
