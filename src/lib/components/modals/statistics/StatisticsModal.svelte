@@ -43,6 +43,7 @@
     writeIncludeUpcoming,
   } from '$lib/stats/upcoming-storage';
   import { pluralize, type FlightData } from '$lib/utils';
+  import { isTerritoryCode } from '$lib/utils/data/countries';
   import { isCompletedFlight } from '$lib/utils/data/flight-timeline';
   import { Duration } from '$lib/utils/datetime';
   import { round } from '$lib/utils/number';
@@ -57,7 +58,7 @@
     flights,
     filteredFlights,
     filters = $bindable(),
-    visitedCountries = [],
+    visitedCountries: visitedPlaces = [],
     showFilters = true,
     seatUserId,
     showCountryStats = true,
@@ -73,6 +74,11 @@
     showCountryStats?: boolean;
     onOpenFlight?: (flightId: number) => void;
   } = $props();
+
+  // Disputed territories can be marked on the map but are not countries.
+  const visitedCountries = $derived(
+    visitedPlaces.filter((place) => !isTerritoryCode(place.code)),
+  );
 
   const showScopeBanner = $derived(flightScopeState.current.scope !== 'mine');
 

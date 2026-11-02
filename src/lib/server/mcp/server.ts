@@ -264,7 +264,7 @@ export const createMcpServer = (principal: ApiPrincipal) => {
     'api-v1-remove-visited-country',
     {
       description: 'Remove a visited country',
-      inputSchema: { code: z.string().length(2) },
+      inputSchema: { code: z.string().min(2).max(3) },
       ...destructive,
     },
     'Unable to remove country',

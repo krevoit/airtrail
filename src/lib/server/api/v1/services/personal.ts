@@ -18,7 +18,7 @@ import {
   ShareSlugTakenError,
 } from '$lib/server/utils/share';
 import { updateUserPreferences } from '$lib/server/utils/user';
-import { isKnownCountryCode } from '$lib/utils/data/countries';
+import { isKnownVisitedPlaceCode } from '$lib/utils/data/countries';
 import {
   listVisitedCountries as listUserVisitedCountries,
   removeVisitedCountry as removeUserVisitedCountry,
@@ -81,10 +81,10 @@ export const removeVisitedCountry = async (
   rawCode: string | null,
 ) => {
   const code = rawCode?.toUpperCase();
-  if (!code || !isKnownCountryCode(code))
+  if (!code || !isKnownVisitedPlaceCode(code))
     throw new ApiOperationError(
       'bad_request',
-      'A known country code is required',
+      'A known country or territory code is required',
     );
   await removeUserVisitedCountry(principal.user.id, code);
   return code;

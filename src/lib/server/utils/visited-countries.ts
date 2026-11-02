@@ -1,10 +1,10 @@
 import { db } from '$lib/db';
 import type { VisitedCountryStatus } from '$lib/db/types';
-import { isKnownCountryCode } from '$lib/utils/data/countries';
+import { isKnownVisitedPlaceCode } from '$lib/utils/data/countries';
 
 type Status = (typeof VisitedCountryStatus)[number];
 
-/** The user's visited countries, leaving out codes that are no longer known. */
+/** The user's visited countries and territories, leaving out unknown codes. */
 export const listVisitedCountries = async (userId: string) => {
   const rows = await db
     .selectFrom('visitedCountry')
@@ -12,7 +12,7 @@ export const listVisitedCountries = async (userId: string) => {
     .where('userId', '=', userId)
     .orderBy('code')
     .execute();
-  return rows.filter((row) => isKnownCountryCode(row.code));
+  return rows.filter((row) => isKnownVisitedPlaceCode(row.code));
 };
 
 export const setVisitedCountry = (
