@@ -7,11 +7,14 @@
   let {
     title,
     subtitle,
+    backLabel = 'Statistics',
     onBack,
     children,
   }: {
     title: string;
     subtitle: string;
+    /** What going back returns to. */
+    backLabel?: string;
     onBack: () => void;
     children: Snippet;
   } = $props();
@@ -20,7 +23,7 @@
 <!-- The modal's own overlay handles dismissing; this only returns to the page. -->
 <button
   type="button"
-  aria-label="Back to statistics"
+  aria-label="Back to {backLabel.toLowerCase()}"
   tabindex="-1"
   class="absolute inset-0 z-10 hidden cursor-default bg-black/30 animate-in fade-in-0 duration-150 md:block dark:bg-black/60"
   onclick={onBack}
@@ -37,13 +40,13 @@
       onclick={onBack}
     >
       <ChevronLeft size={16} />
-      Statistics
+      {backLabel}
     </Button>
     <Button
       variant="ghost"
       size="icon-sm"
       class="hidden text-muted-foreground md:inline-flex"
-      aria-label="Back to statistics"
+      aria-label="Back to {backLabel.toLowerCase()}"
       onclick={onBack}
     >
       <X size={16} />

@@ -1,157 +1,234 @@
+<script lang="ts" module>
+  export type ShareLayout = 'summary' | 'map' | 'story';
+
+  export const SHARE_SIZES: Record<ShareLayout, [number, number]> = {
+    summary: [1080, 1350],
+    map: [1080, 1350],
+    story: [1080, 1920],
+  };
+</script>
+
 <script lang="ts">
-  import { SHORT_MONTHS } from '$lib/data/datetime';
-  import type { YearRecap } from '$lib/stats/recap';
+  import { mapAirports, mapRoutes } from './geo';
+  import { FONT, PALETTES, type RecapTheme } from './palette';
+  import RouteMap from './RouteMap.svelte';
+
+  import type { Recap } from '$lib/stats/recap';
 
   let {
     recap,
     name,
-    distance,
-    distanceUnit,
-    timeAloft,
+    title,
+    subtitle,
+    stats,
+    layout = 'summary',
+    theme = 'light',
     svg = $bindable(),
   }: {
-    recap: YearRecap;
+    recap: Recap;
     name: string;
-    distance: string;
-    distanceUnit: string;
-    timeAloft: string;
+    /** "2026" or "All time". */
+    title: string;
+    subtitle: string;
+    /** Six figures, already formatted. */
+    stats: { label: string; value: string }[];
+    layout?: ShareLayout;
+    theme?: RecapTheme;
     svg?: SVGSVGElement;
   } = $props();
 
-  // The app's light theme, written out because the PNG export can't read CSS
-  // variables.
-  const FOREGROUND = '#09090b';
-  const MUTED = '#71717a';
-  const BORDER = '#e4e4e7';
-  const SECONDARY = '#f4f4f5';
-  const PRIMARY = '#3b82f6';
-  const FONT = 'Public Sans, ui-sans-serif, system-ui, sans-serif';
-
   const PAD = 88;
-  const WIDTH = 1080 - PAD * 2;
-  const COLUMN = WIDTH / 2;
+  const palette = $derived(PALETTES[theme]);
+  const size = $derived(SHARE_SIZES[layout]);
+  const width = $derived(size[0]);
+  const height = $derived(size[1]);
+  const inner = $derived(width - PAD * 2);
 
-  const stats = $derived([
-    { label: 'Flights', value: recap.flights.toLocaleString() },
-    { label: `Distance (${distanceUnit})`, value: distance },
-    { label: 'Duration', value: timeAloft },
-    { label: 'Airports', value: recap.airports.toLocaleString() },
-    { label: 'Countries', value: recap.countries.toLocaleString() },
-    { label: 'Airlines', value: recap.airlines.toLocaleString() },
-  ]);
+  const routes = $derived(mapRoutes(recap.flightList));
+  const airports = $derived(mapAirports(recap.flightList));
+  const countries = $derived(
+    new Set(recap.countryVisits.map((v) => v.country)),
+  );
+
+  // Where each block sits for the chosen layout.
+  const frame = $derived.by(() => {
+    if (layout === 'map') {
+      return {
+        map: { x: 0, y: 0, width, height: 820, radius: 0, padding: 70 },
+        titleY: 960,
+        statsY: 1030,
+        statsColumns: 3,
+        statsRows: 1,
+        chipsY: 1240,
+      };
+    }
+    if (layout === 'story') {
+      return {
+        map: {
+          x: PAD,
+          y: 440,
+          width: inner,
+          height: 640,
+          radius: 28,
+          padding: 40,
+        },
+        titleY: 300,
+        statsY: 1140,
+        statsColumns: 2,
+        statsRows: 3,
+        chipsY: 1720,
+      };
+    }
+    return {
+      map: {
+        x: PAD,
+        y: 400,
+        width: inner,
+        height: 400,
+        radius: 24,
+        padding: 32,
+      },
+      titleY: 290,
+      statsY: 840,
+      statsColumns: 3,
+      statsRows: 2,
+      chipsY: 1236,
+    };
+  });
+
+  const shownStats = $derived(
+    stats.slice(0, frame.statsColumns * frame.statsRows),
+  );
+  const columnWidth = $derived(inner / frame.statsColumns);
+  const rowHeight = $derived(layout === 'story' ? 180 : 170);
   // Bold digits are about 0.6em wide; shrink long values to fit the column.
   const valueSize = (value: string) =>
-    Math.min(76, Math.floor((COLUMN - 40) / (value.length * 0.6)));
-
-  const BAR_GAP = 12;
-  const BAR_WIDTH = (WIDTH - BAR_GAP * 11) / 12;
-  const CHART_TOP = 1040;
-  const CHART_HEIGHT = 120;
-  const monthMax = $derived(Math.max(1, ...recap.flightsPerMonth));
+    Math.min(
+      layout === 'story' ? 92 : 76,
+      Math.floor((columnWidth - 36) / (value.length * 0.6)),
+    );
 
   const CHIP_WIDTH = 84;
   const CHIP_GAP = 10;
-  const chips = $derived(
-    recap.countryVisits
-      .slice(0, Math.floor((WIDTH + CHIP_GAP) / (CHIP_WIDTH + CHIP_GAP)))
-      .map((visit) => visit.country),
+  const chipSlots = $derived(
+    Math.floor((inner + CHIP_GAP) / (CHIP_WIDTH + CHIP_GAP)),
   );
+  const chips = $derived.by(() => {
+    const codes = recap.countryVisits.map((visit) => visit.country);
+    if (codes.length <= chipSlots) return codes;
+    return [
+      ...codes.slice(0, chipSlots - 1),
+      `+${codes.length - (chipSlots - 1)}`,
+    ];
+  });
 </script>
 
 <svg
   bind:this={svg}
   xmlns="http://www.w3.org/2000/svg"
-  viewBox="0 0 1080 1350"
-  width="1080"
-  height="1350"
+  viewBox="0 0 {width} {height}"
+  {width}
+  {height}
   class="h-auto w-full"
   role="img"
-  aria-label="{recap.year} in flights for {name}"
+  aria-label="{title}: {subtitle} for {name}"
   font-family={FONT}
 >
-  <rect width="1080" height="1350" fill="#ffffff" />
+  <rect {width} {height} fill={palette.background} />
 
-  <text x={PAD} y="150" fill={MUTED} font-size="34" font-weight="500"
-    >{name}</text
-  >
-  <text
-    x={PAD}
-    y="300"
-    fill={FOREGROUND}
-    font-size="150"
-    font-weight="700"
-    letter-spacing="-5">{recap.year}</text
-  >
-  <text x={PAD} y="360" fill={MUTED} font-size="38">Year in flights</text>
+  {#if layout === 'map'}
+    <RouteMap {routes} {airports} {countries} {palette} {...frame.map} />
+    <text
+      x={PAD}
+      y={frame.titleY}
+      fill={palette.foreground}
+      font-size="96"
+      font-weight="700"
+      letter-spacing="-3">{title}</text
+    >
+    <text
+      x={width - PAD}
+      y={frame.titleY}
+      fill={palette.mutedForeground}
+      font-size="34"
+      text-anchor="end">{name}</text
+    >
+  {:else}
+    <text
+      x={PAD}
+      y={layout === 'story' ? 170 : 150}
+      fill={palette.mutedForeground}
+      font-size="34"
+      font-weight="500">{name}</text
+    >
+    <text
+      x={PAD}
+      y={frame.titleY}
+      fill={palette.foreground}
+      font-size={layout === 'story' ? 170 : 150}
+      font-weight="700"
+      letter-spacing="-5">{title}</text
+    >
+    <text
+      x={PAD}
+      y={frame.titleY + 60}
+      fill={palette.mutedForeground}
+      font-size="38">{subtitle}</text
+    >
+    <RouteMap {routes} {airports} {countries} {palette} {...frame.map} />
+  {/if}
 
-  {#each stats as stat, index (stat.label)}
-    {@const x = PAD + (index % 2) * COLUMN}
-    {@const y = 430 + Math.floor(index / 2) * 170}
+  {#each shownStats as stat, index (stat.label)}
+    {@const x = PAD + (index % frame.statsColumns) * columnWidth}
+    {@const y =
+      frame.statsY + Math.floor(index / frame.statsColumns) * rowHeight}
     <line
       x1={PAD}
-      x2={PAD + WIDTH}
+      x2={PAD + inner}
       y1={y}
       y2={y}
-      stroke={BORDER}
+      stroke={palette.border}
       stroke-width="2"
     />
-    <text {x} y={y + 58} fill={MUTED} font-size="30">{stat.label}</text>
+    <text {x} y={y + 56} fill={palette.mutedForeground} font-size="30"
+      >{stat.label}</text
+    >
     <text
       {x}
       y={y + 136}
-      fill={FOREGROUND}
+      fill={palette.foreground}
       font-size={valueSize(stat.value)}
       font-weight="700"
       letter-spacing="-2">{stat.value}</text
     >
   {/each}
-  <line
-    x1={PAD}
-    x2={PAD + WIDTH}
-    y1="940"
-    y2="940"
-    stroke={BORDER}
-    stroke-width="2"
-  />
 
-  <text x={PAD} y="1000" fill={MUTED} font-size="30">Flights per month</text>
-  {#each recap.flightsPerMonth as count, month (month)}
-    {@const x = PAD + month * (BAR_WIDTH + BAR_GAP)}
-    {@const height = count ? Math.max(8, (count / monthMax) * CHART_HEIGHT) : 4}
-    <rect
-      {x}
-      y={CHART_TOP + CHART_HEIGHT - height}
-      width={BAR_WIDTH}
-      {height}
-      rx="6"
-      fill={count ? PRIMARY : BORDER}
-    />
-    <text
-      x={x + BAR_WIDTH / 2}
-      y={CHART_TOP + CHART_HEIGHT + 40}
-      fill={MUTED}
-      font-size="24"
-      text-anchor="middle">{SHORT_MONTHS[month]?.[0]}</text
-    >
-  {/each}
-
-  {#each chips as country, index (country)}
+  {#each chips as chip, index (chip)}
     {@const x = PAD + index * (CHIP_WIDTH + CHIP_GAP)}
     <rect
       {x}
-      y="1236"
+      y={frame.chipsY}
       width={CHIP_WIDTH}
       height="48"
       rx="24"
-      fill={SECONDARY}
+      fill={palette.muted}
     />
     <text
       x={x + CHIP_WIDTH / 2}
-      y="1269"
-      fill={FOREGROUND}
+      y={frame.chipsY + 33}
+      fill={palette.foreground}
       font-size="24"
       font-weight="600"
-      text-anchor="middle">{country}</text
+      text-anchor="middle">{chip}</text
     >
   {/each}
+
+  <text
+    x={width - PAD}
+    y={height - 44}
+    fill={palette.mutedForeground}
+    font-size="26"
+    font-weight="600"
+    text-anchor="end">AirTrail</text
+  >
 </svg>

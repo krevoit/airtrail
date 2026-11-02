@@ -1,6 +1,6 @@
 <script lang="ts">
   import NumberFlow from '@number-flow/svelte';
-  import { Plus } from '@o7/icon/lucide';
+  import { Play, Plus } from '@o7/icon/lucide';
 
   import ChartDrillDown from './charts/ChartDrillDown.svelte';
   import ContinentDrillDown from './charts/ContinentDrillDown.svelte';
@@ -502,7 +502,23 @@
     inert={drillDownOpen}
     data-testid="statistics-scroll"
   >
-    <h2 class="pr-8 text-3xl font-bold tracking-tight">Statistics</h2>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 pr-8">
+      <h2 class="text-3xl font-bold tracking-tight">Statistics</h2>
+      {#if showFilters && flights.length}
+        <!-- One picked year opens that year's recap. -->
+        {@const recapYear =
+          selectedYears.length === 1 ? String(selectedYears[0]) : null}
+        <Button
+          href="{resolve('/recap')}{recapYear ? `?year=${recapYear}` : ''}"
+          variant="secondary"
+          size="sm"
+          onclick={() => (open = false)}
+        >
+          <Play size={14} />
+          {recapYear ? `${recapYear} recap` : 'Yearly recap'}
+        </Button>
+      {/if}
+    </div>
     <div class="mt-3 space-y-3">
       {#if showScopeBanner}
         <AdminScopeBanner />

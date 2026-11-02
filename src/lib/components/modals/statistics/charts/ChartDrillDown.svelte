@@ -22,6 +22,7 @@
     initialEntry,
     flights,
     onBack,
+    backLabel,
     onOpenFlight,
     seatUserId,
   }: {
@@ -29,6 +30,7 @@
     initialEntry?: string | null;
     flights: FlightData[];
     onBack: () => void;
+    backLabel?: string;
     onOpenFlight?: (flightId: number) => void;
     seatUserId?: string;
   } = $props();
@@ -102,7 +104,12 @@
   </div>
 {/snippet}
 
-<DrillDownSheet title={FLIGHT_CHARTS[chartKey].title} {subtitle} {onBack}>
+<DrillDownSheet
+  title={FLIGHT_CHARTS[chartKey].title}
+  {subtitle}
+  {backLabel}
+  {onBack}
+>
   {#if breakdown.entries.length > SEARCH_THRESHOLD}
     <Input
       bind:value={query}
