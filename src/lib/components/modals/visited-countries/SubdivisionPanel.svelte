@@ -90,7 +90,7 @@
 </script>
 
 <aside
-  class="absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background/95 shadow-lg backdrop-blur max-md:inset-x-3 max-md:bottom-24 max-md:h-[42vh] md:left-3 md:top-16 md:bottom-24 md:w-80"
+  class="absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background/95 shadow-lg backdrop-blur max-md:inset-x-3 max-md:bottom-24 max-md:h-[42vh] md:left-3 md:top-3 md:bottom-24 md:w-80"
   aria-label="States and provinces of {countryName}"
 >
   <header class="space-y-3 border-b p-3">

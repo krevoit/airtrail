@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RefreshCw } from '@o7/icon/lucide';
+  import { PanelLeft, RefreshCw } from '@o7/icon/lucide';
   import type * as maplibregl from 'maplibre-gl';
   import { mode } from 'mode-watcher';
   import { onDestroy } from 'svelte';
@@ -28,6 +28,7 @@
     SetupVisitedCountries,
   } from '$lib/components/modals';
   import SubdivisionPanel from '$lib/components/modals/visited-countries/SubdivisionPanel.svelte';
+  import VisitedOverviewPanel from '$lib/components/modals/visited-countries/VisitedOverviewPanel.svelte';
   import type { VisitedCountryStatus } from '$lib/db/types';
   import {
     getAppMapImages,
@@ -81,12 +82,40 @@
     page.url.searchParams.get('country')?.toUpperCase() || null,
   );
 
+  // The world overview panel. Open by default on wide screens, and the
+  // choice is remembered.
+  const OVERVIEW_KEY = 'visited-countries-overview';
+  const readOverviewPreference = () => {
+    if (!browser) return false;
+    if (page.url.searchParams.get('view') === 'overview') return true;
+    try {
+      const saved = localStorage.getItem(OVERVIEW_KEY);
+      if (saved !== null) return saved === 'open';
+    } catch {
+      // Storage can be unavailable; fall back to the screen size.
+    }
+    return window.matchMedia('(min-width: 768px)').matches;
+  };
+  let overviewOpen = $state(readOverviewPreference());
+  const setOverview = (open: boolean) => {
+    overviewOpen = open;
+    try {
+      localStorage.setItem(OVERVIEW_KEY, open ? 'open' : 'closed');
+    } catch {
+      // Not remembered; nothing else depends on it.
+    }
+    void fitCountries();
+  };
+
   // Keep the open country in the URL so a refresh or a shared link lands on it.
   $effect(() => {
     const country = focusCountry;
     if (!browser) return;
+    // Only the country is compared, so other parameters (such as the
+    // overview link's) don't trigger a rewrite before the router is ready.
+    const current = page.url.searchParams.get('country')?.toUpperCase() || null;
+    if (current === country) return;
     const search = country ? `?country=${country}` : '';
-    if (search === page.url.search) return;
     // Only the query changes; the path comes from resolve().
     // eslint-disable-next-line svelte/no-navigation-without-resolve
     replaceState(`${resolve('/visited-countries')}${search}`, page.state);
@@ -310,6 +339,21 @@
     focusCountry = country;
   };
 
+  /** From the overview list: open its states, or else its edit dialog. */
+  const selectCountry = (code: string) => {
+    if (subdivisionCounts[code]) {
+      exploreCountry(code);
+      return;
+    }
+    const entry = countries.find((country) => country.code === code);
+    editingInfo = {
+      code,
+      status: entry?.status ?? null,
+      note: entry?.note ?? null,
+    };
+    editing = true;
+  };
+
   const leaveCountry = async () => {
     focusCountry = null;
     await fitCountries();
@@ -358,12 +402,25 @@
       [east, north],
     ];
     map.fitBounds(bounds, {
-      padding: 20,
+      padding: overviewOpen ? panelPadding() : 20,
       linear: false,
     });
   };
 
+  let syncing = $state(false);
   const syncFlights = async () => {
+    if (syncing) return;
+    syncing = true;
+    try {
+      await runSync();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to fill in from flights');
+    } finally {
+      syncing = false;
+    }
+  };
+  const runSync = async () => {
     const result = await api.visitedCountries.importFlights.mutate();
     if (result) {
       await Promise.all([
@@ -388,6 +445,19 @@
   subdivisionProgress={editingProgress}
   onExplore={exploreCountry}
 />
+
+{#if !focusCountry && overviewOpen}
+  <VisitedOverviewPanel
+    {countries}
+    subdivisions={visitedSubdivisions}
+    {subdivisionCounts}
+    statusColors={STATUS_COLORS}
+    {syncing}
+    onClose={() => setOverview(false)}
+    onSelect={selectCountry}
+    onSync={syncFlights}
+  />
+{/if}
 
 {#if focusCountry}
   <SubdivisionPanel
@@ -419,8 +489,8 @@
     attributionControl={false}
   >
     <AttributionControl compact={true} />
-    <NavigationControl />
-    <GeolocateControl />
+    <NavigationControl position="top-right" />
+    <GeolocateControl position="top-right" />
 
     <VectorTileSource id="countries" url="pmtiles:///countries.pmtiles">
       <FillLayer
@@ -462,8 +532,16 @@
       </VectorTileSource>
     {/if}
 
-    <Control position="top-left">
+    <Control position="top-right">
       <ControlGroup>
+        {#if !focusCountry}
+          <ControlButton
+            onclick={() => setOverview(!overviewOpen)}
+            title={overviewOpen ? 'Hide overview' : 'Show overview'}
+          >
+            <PanelLeft size={20} />
+          </ControlButton>
+        {/if}
         <ControlButton
           onclick={syncFlights}
           title="Sync from flights (will never overwrite)"
