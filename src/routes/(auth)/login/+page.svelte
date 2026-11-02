@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LoaderCircle } from '@o7/icon/lucide';
+  import { LoaderCircle, TowerControl } from '@o7/icon/lucide';
   import { onMount } from 'svelte';
   import { toast } from 'svelte-sonner';
   import { superForm } from 'sveltekit-superforms';
@@ -12,14 +12,42 @@
   import * as Alert from '$lib/components/ui/alert';
   import { Button } from '$lib/components/ui/button';
   import * as Form from '$lib/components/ui/form';
-  import { Globe } from '$lib/components/ui/globe';
   import { Input, PasswordInput } from '$lib/components/ui/input';
   import { AcrobaticLoader } from '$lib/components/ui/loader';
+  import RouteGlobe from '$lib/components/recap/RouteGlobe.svelte';
+  import type { LonLat, MapRoute } from '$lib/components/recap/geo';
   import { api } from '$lib/trpc';
   import { isOAuthCallback } from '$lib/utils';
   import { signInSchema } from '$lib/zod/auth';
 
   const { data }: PageProps = $props();
+
+  // Decoration for the sign-in page: a few long-haul routes.
+  const PLACES: Record<string, LonLat> = {
+    LHR: [-0.46, 51.47],
+    JFK: [-73.78, 40.64],
+    SIN: [103.99, 1.36],
+    SYD: [151.18, -33.94],
+    LAX: [-118.41, 33.94],
+    DXB: [55.36, 25.25],
+    HND: [139.78, 35.55],
+    GRU: [-46.47, -23.43],
+    JNB: [28.24, -26.13],
+    CDG: [2.55, 49.01],
+  };
+  const showcaseRoutes: MapRoute[] = [
+    ['LHR', 'JFK'],
+    ['LHR', 'SIN'],
+    ['SIN', 'SYD'],
+    ['SYD', 'LAX'],
+    ['LAX', 'HND'],
+    ['HND', 'SIN'],
+    ['DXB', 'LHR'],
+    ['DXB', 'JNB'],
+    ['GRU', 'CDG'],
+    ['JFK', 'GRU'],
+  ].map(([from, to]) => ({ from: PLACES[from!]!, to: PLACES[to!]!, count: 1 }));
+  const showcaseAirports = Object.values(PLACES);
   const isSetup = data.isSetup;
   let appConfig = $state(data.appConfig);
 
@@ -140,17 +168,25 @@
     <div class="flex items-center justify-center">
       <div class="mx-auto grid w-[350px] gap-6">
         <div class="grid gap-2 text-center">
-          <h1 class="text-3xl font-bold">
-            {page.data.demo ? 'Welcome to AirTrail' : 'Login'}
+          <div class="mb-4 flex items-center justify-center gap-2">
+            <span
+              class="flex size-10 items-center justify-center rounded-xl bg-primary/12 text-primary dark:bg-primary/20"
+            >
+              <TowerControl size={22} />
+            </span>
+            <span class="text-xl font-bold tracking-tight">AirTrail</span>
+          </div>
+          <h1 class="text-3xl font-bold tracking-tight">
+            {page.data.demo ? 'Welcome to AirTrail' : 'Welcome back'}
           </h1>
           <p class="text-muted-foreground text-balance">
             {#if page.data.demo}
               This is a demo of AirTrail, filled with a frequent flyer's
               history. Jump straight in, no account needed.
             {:else if !appConfig?.oauth.enabled}
-              Welcome back! Enter your username and password to login
+              Sign in with your username and password.
             {:else}
-              Welcome back! Login below
+              Sign in to see your flights.
             {/if}
           </p>
         </div>
@@ -200,7 +236,7 @@
               </Form.Control>
               <Form.FieldErrors />
             </Form.Field>
-            <Form.Button disabled={$submitting || oauthLoading}>
+            <Form.Button disabled={$submitting || oauthLoading} size="lg">
               {#if $submitting}
                 <LoaderCircle class="animate-spin mr-1" size="18" />
               {/if}
@@ -212,7 +248,8 @@
           <Button
             onclick={oauthLogin}
             disabled={oauthLoading}
-            variant="outline"
+            size="lg"
+            variant={appConfig.oauth.hidePasswordForm ? 'default' : 'outline'}
           >
             {#if oauthLoading}
               <LoaderCircle class="animate-spin mr-1" size={16} />
@@ -222,8 +259,30 @@
         {/if}
       </div>
     </div>
-    <div class="items-center justify-center relative hidden lg:flex">
-      <Globe />
+    <div class="relative hidden p-3 lg:flex">
+      <div
+        class="relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border bg-muted/40"
+      >
+        <div
+          class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--primary)_0%,transparent_65%)] opacity-[0.07]"
+        ></div>
+        <div class="w-full max-w-[520px] px-10 pb-24">
+          <RouteGlobe
+            routes={showcaseRoutes}
+            airports={showcaseAirports}
+            countries={new Set()}
+          />
+        </div>
+        <div class="absolute inset-x-0 bottom-10 px-10 text-center">
+          <p class="text-xl font-semibold tracking-tight">
+            Every flight you've taken, on one map.
+          </p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Your routes, your stats and your year in flights, on your own
+            server.
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 {:else}
