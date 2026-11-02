@@ -460,10 +460,14 @@
 {/snippet}
 
 {#if $isMediumScreen}
+  <!-- Hidden, not removed, while a details pane covers it: the pane is
+       translucent, and the list keeps its scroll position. -->
   {#if homePanelState.sidebarOpen}
     <aside
       class="glass-pane absolute bottom-3 left-3 top-3 z-10 flex w-[400px] flex-col overflow-hidden rounded-2xl"
+      class:invisible={detailsOpen}
       aria-label="Flights"
+      aria-hidden={detailsOpen}
       transition:fly={{ x: -420, duration: 260, easing: cubicOut }}
     >
       {@render header(false)}
@@ -476,6 +480,7 @@
   {:else}
     <div
       class="glass-pane absolute left-3 top-3 z-10 flex items-center gap-1 rounded-xl p-1"
+      class:invisible={detailsOpen}
       transition:fly={{ x: -40, duration: 200 }}
     >
       <Button
