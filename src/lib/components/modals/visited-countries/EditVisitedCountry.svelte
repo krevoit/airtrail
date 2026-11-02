@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { LoaderCircle, House, Gift, Plane } from '@o7/icon/lucide';
+  import {
+    ChevronRight,
+    LoaderCircle,
+    House,
+    Gift,
+    Plane,
+  } from '@o7/icon/lucide';
   import { Tour } from '@o7/icon/material';
   import { toast } from 'svelte-sonner';
 
@@ -10,21 +16,39 @@
   import type { VisitedCountryStatus } from '$lib/db/types';
   import { api, trpc } from '$lib/trpc';
   import { cn } from '$lib/utils';
-  import { type Country, countryFromAlpha2 } from '$lib/utils/data/countries';
+  import {
+    countryFromAlpha2,
+    type VisitedPlace,
+    visitedPlaceFromCode,
+  } from '$lib/utils/data/countries';
 
   let {
     open = $bindable(),
     editingInfo,
+    subdivisionProgress = null,
+    onExplore,
   }: {
     open: boolean;
     editingInfo: {
       code: string;
       status: (typeof VisitedCountryStatus)[number] | null;
       note: string | null;
+      /** Set when editing a state or province rather than a country. */
+      subdivision?: { name: string; country: string };
     } | null;
+    /** Visited and total states/provinces of the country being edited. */
+    subdivisionProgress?: { visited: number; total: number } | null;
+    onExplore?: (country: string) => void;
   } = $props();
 
-  let countryData: Country | undefined = $state(undefined);
+  const subdivision = $derived(editingInfo?.subdivision);
+
+  let countryData = $state<VisitedPlace | undefined>(undefined);
+  const claimants = $derived(
+    (countryData?.claimants ?? [])
+      .map((code) => countryFromAlpha2(code)?.name ?? code)
+      .join(', '),
+  );
   let status: (typeof VisitedCountryStatus)[number] | null = $state(null);
   let note: string = $state('');
   $effect(() => {
@@ -34,7 +58,9 @@
       return;
     }
 
-    countryData = countryFromAlpha2(editingInfo.code);
+    countryData = visitedPlaceFromCode(
+      editingInfo.subdivision?.country ?? editingInfo.code,
+    );
     status = editingInfo?.status;
     note = editingInfo.note ?? '';
   });
@@ -45,13 +71,22 @@
 
     loading = true;
     try {
-      const success = await api.visitedCountries.save.mutate({
-        code: countryData.alpha2,
-        status,
-        note: note ?? undefined,
-      });
+      const success = subdivision
+        ? await api.visitedCountries.saveSubdivision.mutate({
+            code: editingInfo!.code,
+            status,
+            note: note || null,
+          })
+        : await api.visitedCountries.save.mutate({
+            code: countryData.code,
+            status,
+            note: note ?? undefined,
+          });
       if (success) {
-        await trpc.visitedCountries.list.utils.invalidate();
+        await Promise.all([
+          trpc.visitedCountries.list.utils.invalidate(),
+          trpc.visitedCountries.listSubdivisions.utils.invalidate(),
+        ]);
         open = false;
       } else {
         toast.error('Failed to save');
@@ -75,13 +110,39 @@
     note = editingInfo?.note ?? '';
   }}
 >
-  <h2 class="text-lg font-bold max-md:mb-2">{countryData?.name}</h2>
+  <div class="max-md:mb-2">
+    <h2 class="text-lg font-bold">{subdivision?.name ?? countryData?.name}</h2>
+    {#if subdivision}
+      <p class="text-sm text-muted-foreground">{countryData?.name}</p>
+    {:else if countryData?.kind === 'territory'}
+      <p class="text-sm text-muted-foreground">
+        Disputed territory{claimants ? ` · ${claimants}` : ''}. Not counted as a
+        country in statistics.
+      </p>
+    {/if}
+  </div>
   <div class="grid grid-cols-2 gap-2">
     {@render statusRadioItem('visited', 'Visited')}
     {@render statusRadioItem('lived', 'Lived')}
     {@render statusRadioItem('wishlist', 'Wishlist')}
     {@render statusRadioItem('layover', 'Layover')}
   </div>
+  {#if !subdivision && subdivisionProgress && onExplore}
+    <Button
+      variant="outline"
+      class="justify-between"
+      onclick={() => {
+        open = false;
+        onExplore(countryData!.code);
+      }}
+    >
+      <span>States &amp; provinces</span>
+      <span class="flex items-center gap-1 text-muted-foreground">
+        {subdivisionProgress.visited}/{subdivisionProgress.total}
+        <ChevronRight size={16} />
+      </span>
+    </Button>
+  {/if}
   <Textarea
     bind:value={note}
     placeholder="Note"

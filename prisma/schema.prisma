@@ -50,6 +50,7 @@ model user {
   sessions                     session[]
   flight_passengers            flight_passenger[]
   visited_countries            visited_country[]
+  visited_subdivisions         visited_subdivision[]
   api_keys                     api_key[]
   public_share                 public_share[]
   oauth_link_token             oauth_link_token?
@@ -269,8 +270,8 @@ model flight_passenger {
 model visited_country {
   id Int @id @default(autoincrement())
 
-  /// ISO 3166-1 alpha-2 or EU user-assigned country code
-  code   String  @db.VarChar(2)
+  /// ISO 3166-1 alpha-2 or EU user-assigned country code, or a GISCO disputed territory code
+  code   String  @db.VarChar(3)
   /// @kyselyType('lived' | 'visited' | 'layover' | 'wishlist')
   status String
   note   String?
@@ -279,6 +280,24 @@ model visited_country {
   user    user   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([code, user_id], map: "visited_country_code_user_id_key")
+}
+
+model visited_subdivision {
+  id Int @id @default(autoincrement())
+
+  /// ISO 3166-2 code, or an AirTrail region code for merged areas (e.g. `SI-R-GORENJSKA`)
+  code    String  @db.VarChar(32)
+  /// ISO 3166-1 alpha-2 code of the country the subdivision belongs to
+  country String  @db.VarChar(3)
+  /// @kyselyType('lived' | 'visited' | 'layover' | 'wishlist')
+  status  String
+  note    String?
+
+  user_id String
+  user    user   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([code, user_id], map: "visited_subdivision_code_user_id_key")
+  @@index([user_id, country], map: "visited_subdivision_user_id_country_idx")
 }
 
 model session {

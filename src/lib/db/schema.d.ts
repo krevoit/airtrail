@@ -370,9 +370,26 @@ export type user = {
 export type visited_country = {
     id: Generated<number>;
     /**
-     * ISO 3166-1 alpha-2 or EU user-assigned country code
+     * ISO 3166-1 alpha-2 or EU user-assigned country code, or a GISCO disputed territory code
      */
     code: string;
+    /**
+     * @kyselyType('lived' | 'visited' | 'layover' | 'wishlist')
+     */
+    status: 'lived' | 'visited' | 'layover' | 'wishlist';
+    note: string | null;
+    userId: string;
+};
+export type visited_subdivision = {
+    id: Generated<number>;
+    /**
+     * ISO 3166-2 code, or an AirTrail region code for merged areas (e.g. `SI-R-GORENJSKA`)
+     */
+    code: string;
+    /**
+     * ISO 3166-1 alpha-2 code of the country the subdivision belongs to
+     */
+    country: string;
     /**
      * @kyselyType('lived' | 'visited' | 'layover' | 'wishlist')
      */
@@ -408,4 +425,5 @@ export type DB = {
     session: session;
     user: user;
     visitedCountry: visited_country;
+    visitedSubdivision: visited_subdivision;
 };
