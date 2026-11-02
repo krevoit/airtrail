@@ -34,6 +34,10 @@
     { label: 'Countries', value: recap.countries.toLocaleString() },
     { label: 'Airlines', value: recap.airlines.toLocaleString() },
   ]);
+  // Each stat column is 300 units wide. Shrink long values such as "4d 6h 41m"
+  // so they don't run into the next column (bold serif digits are ~0.55em).
+  const valueFontSize = (value: string) =>
+    Math.min(70, Math.floor(260 / (value.length * 0.55)));
   const laps = $derived(recap.distanceKm / EARTH_CIRCUMFERENCE_KM);
   const stamps = $derived(recap.stamps.slice(0, 7));
   const stampSpacing = $derived(
@@ -147,7 +151,7 @@
       y={y + 78}
       fill={INK}
       font-family="ui-serif, Georgia, serif"
-      font-size="70"
+      font-size={valueFontSize(stat.value)}
       font-weight="700">{stat.value}</text
     >
   {/each}

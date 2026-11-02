@@ -71,6 +71,16 @@
     year === null ? null : computeYearRecap(flights, year, user?.id),
   );
   const name = $derived(user?.displayName || user?.username || 'Traveller');
+  const entriesLabel = $derived(
+    !recap
+      ? ''
+      : [
+          `${recap.stamps.length} ${recap.stamps.length === 1 ? 'country' : 'countries'}`,
+          recap.newCountries.length ? `${recap.newCountries.length} new` : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+  );
   const unit = $derived(distanceUnitLabel(prefs));
   const distance = (km: number) =>
     Math.round(convertDistance(km, prefs)).toLocaleString();
@@ -277,11 +287,7 @@
           <div class="flex items-baseline justify-between gap-4">
             <p class="page-label">Entries</p>
             <p class="text-sm text-[#7a705c]">
-              {recap.stamps.length}
-              {recap.stamps.length === 1
-                ? 'country'
-                : 'countries'}{#if recap.newCountries.length}
-                · {recap.newCountries.length} new{/if}
+              {entriesLabel}
             </p>
           </div>
           <div
@@ -336,7 +342,7 @@
           <article class="highlight">
             <p class="field-label">Most flown route</p>
             <p class="route">
-              {airportCode(recap.topRoute.item.from)} ⇄ {airportCode(
+              {airportCode(recap.topRoute.item.from)} ↔ {airportCode(
                 recap.topRoute.item.to,
               )}
             </p>
