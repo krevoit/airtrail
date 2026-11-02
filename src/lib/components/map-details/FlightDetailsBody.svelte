@@ -12,6 +12,7 @@
     toTitleCase,
     type FlightData,
   } from '$lib/utils';
+  import { formatRegistration } from '$lib/utils/registration';
   import type { Preferences } from '$lib/zod/user';
 
   let {
@@ -86,7 +87,7 @@
         flight.aircraft && { label: 'Aircraft', value: flight.aircraft.name },
         flight.aircraftReg && {
           label: 'Registration',
-          value: flight.aircraftReg,
+          value: formatRegistration(flight.aircraftReg),
         },
         seatLabel && { label: 'Seat', value: seatLabel },
         you?.flightReason && {
