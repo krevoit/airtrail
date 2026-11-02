@@ -7,8 +7,7 @@
     flightLabel,
   } from './format';
 
-  import { AirlineIcon, LiveryImage } from '$lib/components/display';
-  import { liveryUrl } from '$lib/liveries.svelte';
+  import { AirlineIcon } from '$lib/components/display';
   import type { FlightData } from '$lib/utils';
 
   let {
@@ -24,10 +23,6 @@
   const date = $derived(dateBlock(flight));
   const label = $derived(flightLabel(flight));
   const duration = $derived(durationLabel(flight.duration));
-  // A livery image replaces the airline icon; null when the airline has none.
-  const livery = $derived(
-    liveryUrl(flight.airline?.icao, flight.aircraft?.icao, flight.aircraftReg),
-  );
 </script>
 
 <button
@@ -72,35 +67,20 @@
     </span>
   </span>
   <span class="flex min-w-0 flex-col items-end gap-1">
-    {#if livery !== null && flight.airline}
-      <LiveryImage
-        airline={flight.airline}
-        aircraft={flight.aircraft}
-        registration={flight.aircraftReg}
-      />
+    {#if label}
       <span
-        class="max-w-[8.5rem] truncate text-[12px] tabular-nums text-muted-foreground"
+        class="flex max-w-[8.5rem] items-center gap-1.5 text-[12.5px] font-medium"
       >
-        {[label !== flight.airline.name ? label : null, duration]
-          .filter(Boolean)
-          .join(' · ')}
+        {#if flight.airline}
+          <AirlineIcon airline={flight.airline} size={16} />
+        {/if}
+        <span class="truncate">{label}</span>
       </span>
-    {:else}
-      {#if label}
-        <span
-          class="flex max-w-[8.5rem] items-center gap-1.5 text-[12.5px] font-medium"
-        >
-          {#if flight.airline}
-            <AirlineIcon airline={flight.airline} size={16} />
-          {/if}
-          <span class="truncate">{label}</span>
-        </span>
-      {/if}
-      {#if duration}
-        <span class="text-[12px] tabular-nums text-muted-foreground"
-          >{duration}</span
-        >
-      {/if}
+    {/if}
+    {#if duration}
+      <span class="text-[12px] tabular-nums text-muted-foreground"
+        >{duration}</span
+      >
     {/if}
   </span>
 </button>

@@ -101,20 +101,6 @@ const pwaOptions = {
         },
       },
       {
-        // Airline livery images and their index; they only change with a
-        // new release.
-        urlPattern: /\/liveries\//,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'liveries',
-          expiration: {
-            maxEntries: 1000,
-            maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-          },
-          cacheableResponse: { statuses: [0, 200] },
-        },
-      },
-      {
         // Same-origin map-style route (map-style JSON).
         urlPattern: /\/api\/map-styles\//,
         handler: 'StaleWhileRevalidate',

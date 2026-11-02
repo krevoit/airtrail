@@ -17,7 +17,7 @@
   } from './timeline';
 
   import { page } from '$app/state';
-  import { AirlineIcon, LiveryImage } from '$lib/components/display';
+  import { AirlineIcon } from '$lib/components/display';
   import { formatSeatForUser } from '$lib/utils';
   import { getPreferences } from '$lib/utils/preferences';
 
@@ -198,15 +198,7 @@
       class="mt-3 flex items-center gap-2 border-t pt-3 text-[12.5px] text-muted-foreground"
     >
       {#if flight.airline}
-        {#snippet icon()}
-          <AirlineIcon airline={flight.airline} size={18} />
-        {/snippet}
-        <LiveryImage
-          airline={flight.airline}
-          aircraft={flight.aircraft}
-          registration={flight.aircraftReg}
-          fallback={icon}
-        />
+        <AirlineIcon airline={flight.airline} size={18} />
       {/if}
       <span class="flex min-w-0 items-center gap-1.5 truncate">
         {#if label}<span class="shrink-0 font-medium text-foreground"
