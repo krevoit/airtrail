@@ -67,6 +67,7 @@
     }
     if (hasClientPermission(page.data.authorization, 'flight.read.own')) {
       items.push({ label: 'Visited countries', href: '/visited-countries' });
+      items.push({ label: 'Yearly recap', href: '/recap' });
     }
     return items;
   });
