@@ -750,10 +750,10 @@
 {/snippet}
 
 {#snippet actions(flight: (typeof formattedFlights)[number])}
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-0.5 text-muted-foreground">
     {#if onNavigate && canShowFlightOnMap(flight)}
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
         disabled={selecting}
         aria-label="Show on map"
@@ -768,7 +768,7 @@
     {/if}
     {#if canDeleteFlight(flight)}
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
         disabled={selecting}
         aria-label="Delete flight"

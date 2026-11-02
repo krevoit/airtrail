@@ -18,7 +18,7 @@
 </script>
 
 <Button
-  variant="outline"
+  variant="ghost"
   size="icon"
   onclick={() => (open = true)}
   disabled={triggerDisabled}

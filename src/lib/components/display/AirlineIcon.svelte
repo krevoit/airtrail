@@ -22,6 +22,19 @@
   let imageRef = $state<HTMLImageElement | null>(null);
 
   const iconPath = $derived(airline?.iconPath ?? null);
+  const monogram = $derived(
+    airline
+      ? (
+          airline.iata ??
+          airline.icao ??
+          airline.name
+            .split(/\s+/)
+            .map((word) => word[0])
+            .join('')
+            .slice(0, 2)
+        ).toUpperCase()
+      : null,
+  );
   const hasIcon = $derived(!!iconPath);
   const iconSrc = $derived(iconPath ? `/api/uploads/${iconPath}` : '');
 
@@ -122,10 +135,10 @@
     />
     <Avatar.Fallback class="rounded-none bg-transparent">
       <div
-        class="flex items-center justify-center text-destructive"
+        class="flex items-center justify-center text-muted-foreground"
         style:width="{size}px"
         style:height="{size}px"
-        title="Failed to load icon"
+        title={airline?.name}
       >
         {@render fallbackIcon()}
       </div>
@@ -142,7 +155,19 @@
 {/if}
 
 {#snippet fallbackIcon()}
-  {#if fallback === 'plane'}
+  {#if monogram}
+    <!-- The airline's code, when there's no logo to show. -->
+    <span
+      class="flex size-full items-center justify-center rounded-[22%] bg-muted font-semibold tracking-tight text-muted-foreground ring-1 ring-border/60"
+      style:font-size="{Math.max(
+        8,
+        size * (monogram.length > 2 ? 0.3 : 0.36),
+      )}px"
+      title={airline?.name}
+    >
+      {monogram}
+    </span>
+  {:else if fallback === 'plane'}
     <Plane size={size * 0.7} />
   {:else}
     <Airlines size={size * 0.8} />
