@@ -401,69 +401,76 @@
   />
 {/if}
 
-<MapLibre
-  {style}
-  {images}
-  projection={{ type: 'globe' }}
-  diffStyleUpdates
-  zoom={2}
-  bind:map
-  bind:loaded
-  onload={load}
-  attributionControl={false}
->
-  <AttributionControl compact={true} />
-  <NavigationControl />
-  <GeolocateControl />
+<!--
+  The layout fills in the map config after this page mounts. Creating the map
+  before then gives it a provisional style URL, and swapping to the real one
+  with diffStyleUpdates drops the country and subdivision layers.
+-->
+{#if appConfig.config}
+  <MapLibre
+    {style}
+    {images}
+    projection={{ type: 'globe' }}
+    diffStyleUpdates
+    zoom={2}
+    bind:map
+    bind:loaded
+    onload={load}
+    attributionControl={false}
+  >
+    <AttributionControl compact={true} />
+    <NavigationControl />
+    <GeolocateControl />
 
-  <VectorTileSource id="countries" url="pmtiles:///countries.pmtiles">
-    <FillLayer
-      id="countries"
-      sourceLayer="countries"
-      beforeId={firstLabelLayerId}
-      beforeLayerType="symbol"
-      hoverCursor="pointer"
-      interactive
-      paint={{
-        'fill-color': buildFillColor(),
-        'fill-opacity': countryFillOpacity,
-      }}
-      onclick={handleCountryClick}
-    />
-  </VectorTileSource>
-
-  {#if focusCountry}
-    <VectorTileSource id="subdivisions" url="pmtiles:///subdivisions.pmtiles">
+    <VectorTileSource id="countries" url="pmtiles:///countries.pmtiles">
       <FillLayer
-        id="subdivisions-fill"
-        sourceLayer="subdivisions"
+        id="countries"
+        sourceLayer="countries"
         beforeId={firstLabelLayerId}
         beforeLayerType="symbol"
-        filter={subdivisionFilter}
         hoverCursor="pointer"
         interactive
-        paint={{ 'fill-color': subdivisionFillColor }}
-        onclick={handleSubdivisionClick}
-      />
-      <LineLayer
-        id="subdivisions-line"
-        sourceLayer="subdivisions"
-        beforeId={firstLabelLayerId}
-        beforeLayerType="symbol"
-        filter={subdivisionFilter}
-        paint={{ 'line-color': subdivisionLineColor, 'line-width': 0.8 }}
+        paint={{
+          'fill-color': buildFillColor(),
+          'fill-opacity': countryFillOpacity,
+        }}
+        onclick={handleCountryClick}
       />
     </VectorTileSource>
-  {/if}
 
-  <Control position="top-left">
-    <ControlGroup>
-      <ControlButton
-        onclick={syncFlights}
-        title="Sync from flights (will never overwrite)"
-      >
-        <RefreshCw size={20} />
-      </ControlButton>
-    </ControlGroup>
-  </Control>
-</MapLibre>
+    {#if focusCountry}
+      <VectorTileSource id="subdivisions" url="pmtiles:///subdivisions.pmtiles">
+        <FillLayer
+          id="subdivisions-fill"
+          sourceLayer="subdivisions"
+          beforeId={firstLabelLayerId}
+          beforeLayerType="symbol"
+          filter={subdivisionFilter}
+          hoverCursor="pointer"
+          interactive
+          paint={{ 'fill-color': subdivisionFillColor }}
+          onclick={handleSubdivisionClick}
+        />
+        <LineLayer
+          id="subdivisions-line"
+          sourceLayer="subdivisions"
+          beforeId={firstLabelLayerId}
+          beforeLayerType="symbol"
+          filter={subdivisionFilter}
+          paint={{ 'line-color': subdivisionLineColor, 'line-width': 0.8 }}
+        />
+      </VectorTileSource>
+    {/if}
+
+    <Control position="top-left">
+      <ControlGroup>
+        <ControlButton
+          onclick={syncFlights}
+          title="Sync from flights (will never overwrite)"
+        >
+          <RefreshCw size={20} />
+        </ControlButton>
+      </ControlGroup>
+    </Control>
+  </MapLibre>
+{/if}
