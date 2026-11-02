@@ -7,6 +7,7 @@
   import { hasClientPermission } from '$lib/authorization/permissions';
   import {
     createDefaultFilters,
+    hasFlightFilters,
     matchesFlight,
     matchesLocationFilters,
     matchesNonLocationFilters,
@@ -17,6 +18,7 @@
     type FlightFilters,
     type TempFilters,
   } from '$lib/components/flight-filters/types';
+  import HomePanel from '$lib/components/home/HomePanel.svelte';
   import { Map } from '$lib/components/map';
   import { MapDetailsPane } from '$lib/components/map-details';
   import { ListFlightsModal, StatisticsModal } from '$lib/components/modals';
@@ -244,6 +246,13 @@
     {filteredFlights}
     {flightTracks}
     onNavigate={navigateFlights}
+  />
+  <HomePanel
+    flights={filteredFlights}
+    allFlights={flights}
+    seatUserId={effectiveSeatUserId}
+    filtered={hasFlightFilters(filters)}
+    onClearFilters={() => (filters = createDefaultFilters())}
   />
   <MapDetailsPane
     {flights}

@@ -189,3 +189,23 @@ export const versionState = $state<{
   isChecking: false,
   alreadyChecked: false,
 });
+
+/**
+ * The home page's flights panel: a sidebar on wide screens, a bottom sheet
+ * on narrow ones. The map keeps its camera clear of whichever is showing.
+ */
+export const homePanelState = $state<{
+  /** Whether the desktop sidebar is open. */
+  sidebarOpen: boolean;
+  /** Whether the panel is on screen at all (only on the home page). */
+  mounted: boolean;
+  /** Height of the mobile sheet in pixels, 0 when hidden. */
+  sheetHeight: number;
+}>({
+  sidebarOpen: true,
+  mounted: false,
+  sheetHeight: 0,
+});
+
+/** Width the desktop sidebar takes from the map, including its margin. */
+export const HOME_SIDEBAR_WIDTH = 420;

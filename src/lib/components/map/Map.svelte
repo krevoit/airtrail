@@ -75,6 +75,8 @@
     flightScopeState,
     flightAddedState,
     getFlightRouteDisplay,
+    HOME_SIDEBAR_WIDTH,
+    homePanelState,
     mapDetailsState,
   } from '$lib/state.svelte';
   import type { FlightTrackRow } from '$lib/track/schema';
@@ -107,7 +109,10 @@
   } = $props();
 
   const showScopeBanner = $derived(flightScopeState.current.scope !== 'mine');
-  const alignStatusWithDetails = $derived(!!mapDetailsState.selection);
+  const alignStatusWithDetails = $derived(
+    !!mapDetailsState.selection ||
+      (homePanelState.mounted && homePanelState.sidebarOpen),
+  );
 
   let map: MapLibreMap | undefined = $state.raw(undefined);
   let cameraController: MapCameraController | undefined = $state.raw(undefined);
@@ -188,12 +193,29 @@
   const allVisitedAirports = $derived(prepareVisitedAirports(flights));
   const allFlightArcs = $derived(prepareFlightArcData(flights));
 
+  // Keep the camera clear of the home flights panel (a sidebar on wide
+  // screens, a bottom sheet on narrow ones) and of the details pane.
   const detailsPanePadding = () => {
+    const sidebar =
+      $isMediumScreen && homePanelState.mounted && homePanelState.sidebarOpen;
+    const sheet =
+      !$isMediumScreen && homePanelState.mounted
+        ? homePanelState.sheetHeight
+        : 0;
     if (!mapDetailsState.selection) {
+      if (sidebar) {
+        return {
+          top: 40,
+          right: 60,
+          bottom: 40,
+          left: HOME_SIDEBAR_WIDTH + 20,
+        };
+      }
+      if (sheet) return { top: 40, right: 20, bottom: sheet + 20, left: 20 };
       return { top: 0, right: 0, bottom: 0, left: 0 };
     }
     return $isMediumScreen
-      ? { top: 40, right: 40, bottom: 40, left: 420 }
+      ? { top: 40, right: 60, bottom: 40, left: HOME_SIDEBAR_WIDTH + 20 }
       : { top: 40, right: 20, bottom: window.innerHeight * 0.55, left: 20 };
   };
 

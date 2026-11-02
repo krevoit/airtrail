@@ -9,6 +9,8 @@
     testId?: string;
     href?: string;
     onClick?: () => void;
+    /** The page this item leads to is the one open. */
+    active?: boolean;
   };
   const onClick = () => {
     if (item.onClick) item.onClick();
@@ -27,7 +29,10 @@
         <Tooltip.Trigger
           data-testid={item.testId}
           aria-label={item.label}
-          class="hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80 transition-all duration-200 rounded-full p-3 mx-0"
+          aria-current={item.active ? 'page' : undefined}
+          class="hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80 transition-all duration-200 rounded-full p-3 mx-0 {item.active
+            ? 'bg-primary/12 text-primary dark:bg-primary/20'
+            : ''}"
         >
           <svelte:component this={item.icon} />
         </Tooltip.Trigger>

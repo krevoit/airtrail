@@ -45,10 +45,11 @@
   {#if open}
     <div
       in:fly={{ x: -420, duration: 260, easing: cubicOut }}
-      class="absolute top-3 left-3 z-20 flex max-w-[calc(100vw-1.5rem)] items-start gap-2"
+      class="absolute top-3 bottom-3 left-3 z-20 flex max-w-[calc(100vw-1.5rem)] items-start gap-2"
     >
+      <!-- Same place and size as the home flights panel, which it covers. -->
       <aside
-        class="glass-pane flex max-h-[calc(100vh-1.5rem)] w-[380px] max-w-full flex-col overflow-hidden rounded-xl"
+        class="glass-pane flex h-full w-[400px] max-w-full flex-col overflow-hidden rounded-2xl"
       >
         {@render header()}
         <Separator />
