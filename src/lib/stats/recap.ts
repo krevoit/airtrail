@@ -17,7 +17,7 @@ export type RecapFlight = {
   airline: Airline | null;
 };
 
-export type RecapStamp = {
+export type RecapCountryVisit = {
   country: string;
   /** Airport where the country was first reached this year. */
   airport: Airport;
@@ -52,7 +52,7 @@ export type YearRecap = {
   flightsPerMonth: number[];
   seats: Record<string, number>;
   classes: Record<string, number>;
-  stamps: RecapStamp[];
+  countryVisits: RecapCountryVisit[];
   previousYearFlights: number | null;
   previousYearDistanceKm: number | null;
 };
@@ -161,8 +161,8 @@ export const computeYearRecap = (
   const flightsPerMonth = Array.from({ length: 12 }, () => 0);
   const seats: Record<string, number> = {};
   const classes: Record<string, number> = {};
-  const stamps: RecapStamp[] = [];
-  const stamped = new Set<string>();
+  const countryVisits: RecapCountryVisit[] = [];
+  const reached = new Set<string>();
   let durationSeconds = 0;
   let longestFlight: RecapFlight | null = null;
   let shortestFlight: RecapFlight | null = null;
@@ -183,12 +183,12 @@ export const computeYearRecap = (
       countries.add(airport.country);
       bump(airportCounts, String(airport.id), airport);
     }
-    // A country is stamped where it was first reached: the destination, or
+    // A country counts as reached where the year first touched it: the destination, or
     // the origin of the year's first flight from it.
     for (const airport of [flight.from, flight.to]) {
-      if (!airport || stamped.has(airport.country)) continue;
-      stamped.add(airport.country);
-      stamps.push({
+      if (!airport || reached.has(airport.country)) continue;
+      reached.add(airport.country);
+      countryVisits.push({
         country: airport.country,
         airport,
         date,
@@ -276,34 +276,10 @@ export const computeYearRecap = (
     flightsPerMonth,
     seats,
     classes,
-    stamps,
+    countryVisits,
     previousYearFlights: previous.length ? previous.length : null,
     previousYearDistanceKm: previous.length
       ? Math.round(totals(previous).distanceKm)
       : null,
   };
-};
-
-/**
- * Two lines in the style of a passport's machine-readable zone, 44
- * characters each.
- */
-export const machineReadableZone = (name: string, recap: YearRecap) => {
-  const clean = (value: string) =>
-    value
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '<');
-  const pad = (value: string) => value.padEnd(44, '<').slice(0, 44);
-  const first = pad(`P<ATR${clean(name)}<<${recap.year}`);
-  const second = pad(
-    [
-      `${recap.flights}FLT`,
-      `${recap.distanceKm}KM`,
-      `${recap.airports}APT`,
-      `${recap.countries}CTY`,
-    ].join('<'),
-  );
-  return [first, second] as const;
 };

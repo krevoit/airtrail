@@ -5,47 +5,34 @@
     Download,
     LoaderCircle,
   } from '@o7/icon/lucide';
+  import type { Snippet } from 'svelte';
   import { toast } from 'svelte-sonner';
 
   import { replaceState } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import ColumnChart from '$lib/components/modals/statistics/charts/ColumnChart.svelte';
   import { downloadSvgAsPng } from '$lib/components/recap/export-image';
-  import PassportStamp from '$lib/components/recap/PassportStamp.svelte';
   import RecapShareCard from '$lib/components/recap/RecapShareCard.svelte';
+  import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
+  import { MONTHS, SHORT_MONTHS } from '$lib/data/datetime';
   import type { Airport } from '$lib/db/types';
   import {
     computeYearRecap,
     EARTH_CIRCUMFERENCE_KM,
-    machineReadableZone,
-    MOON_DISTANCE_KM,
     recapYears,
   } from '$lib/stats/recap';
   import { trpc } from '$lib/trpc';
-  import { prepareFlightData, toTitleCase } from '$lib/utils';
+  import { pluralize, prepareFlightData, toTitleCase } from '$lib/utils';
   import { countryFromAlpha2 } from '$lib/utils/data/countries';
   import { Duration } from '$lib/utils/datetime';
+  import { round } from '$lib/utils/number';
   import {
     convertDistance,
     distanceUnitLabel,
     getPreferences,
   } from '$lib/utils/preferences';
-
-  const MONTHS = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
 
   const user = $derived(page.data.user);
   const prefs = $derived(getPreferences(user));
@@ -71,16 +58,6 @@
     year === null ? null : computeYearRecap(flights, year, user?.id),
   );
   const name = $derived(user?.displayName || user?.username || 'Traveller');
-  const entriesLabel = $derived(
-    !recap
-      ? ''
-      : [
-          `${recap.stamps.length} ${recap.stamps.length === 1 ? 'country' : 'countries'}`,
-          recap.newCountries.length ? `${recap.newCountries.length} new` : '',
-        ]
-          .filter(Boolean)
-          .join(' · '),
-  );
   const unit = $derived(distanceUnitLabel(prefs));
   const distance = (km: number) =>
     Math.round(convertDistance(km, prefs)).toLocaleString();
@@ -90,27 +67,35 @@
   const airportPlace = (airport: Airport) =>
     airport.municipality ?? airport.name;
   const countryName = (code: string) => countryFromAlpha2(code)?.name ?? code;
-  const stampDate = (date: Date | null) =>
-    date
-      ? date
-          .toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: '2-digit',
-          })
-          .toUpperCase()
-      : String(year);
+  const shortDate = (date: Date | null) =>
+    date?.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const subtitle = $derived(
+    recap?.upcomingFlights
+      ? `Your year in flights so far, with ${recap.upcomingFlights} more ${pluralize(recap.upcomingFlights, 'flight')} booked.`
+      : 'Your year in flights.',
+  );
+  const newCount = (count: number) => (count ? `${count} new` : null);
 
-  const mrz = $derived(recap ? machineReadableZone(name, recap) : null);
   const laps = $derived(recap ? recap.distanceKm / EARTH_CIRCUMFERENCE_KM : 0);
-  const moon = $derived(recap ? recap.distanceKm / MOON_DISTANCE_KM : 0);
-  const monthMax = $derived(Math.max(1, ...(recap?.flightsPerMonth ?? [])));
+  const months = $derived(
+    (recap?.flightsPerMonth ?? []).map((value, month) => ({
+      key: month,
+      label: SHORT_MONTHS[month] ?? '',
+      name: MONTHS[month] ?? '',
+      value,
+    })),
+  );
 
-  const change = (current: number, previous: number | null) => {
-    if (!previous) return null;
-    const delta = Math.round(((current - previous) / previous) * 100);
-    return delta === 0 ? 'Same as' : `${delta > 0 ? '+' : ''}${delta}% vs`;
-  };
+  const flightsChange = $derived.by(() => {
+    if (!recap?.previousYearFlights) return null;
+    const delta = Math.round(
+      ((recap.flights - recap.previousYearFlights) /
+        recap.previousYearFlights) *
+        100,
+    );
+    if (delta === 0) return `same as ${recap.year - 1}`;
+    return `${delta > 0 ? '+' : ''}${delta}% on ${recap.year - 1}`;
+  });
 
   const favourite = (counts: Record<string, number>) => {
     const entries = Object.entries(counts).sort(([, a], [, b]) => b - a);
@@ -124,13 +109,107 @@
       : null;
   };
 
+  type Highlight = { label: string; value: string; detail: string };
+  const highlights = $derived.by(() => {
+    if (!recap) return [];
+    const list: Highlight[] = [];
+    const route = (from: Airport, to: Airport, arrow = '→') =>
+      `${airportCode(from)} ${arrow} ${airportCode(to)}`;
+    if (recap.longestFlight) {
+      const flight = recap.longestFlight;
+      list.push({
+        label: 'Longest flight',
+        value: route(flight.from, flight.to),
+        detail: [
+          `${distance(flight.distanceKm)} ${unit}`,
+          flight.durationSeconds ? duration(flight.durationSeconds) : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+    }
+    if (recap.shortestFlight) {
+      const flight = recap.shortestFlight;
+      list.push({
+        label: 'Shortest flight',
+        value: route(flight.from, flight.to),
+        detail: `${distance(flight.distanceKm)} ${unit}`,
+      });
+    }
+    if (recap.topRoute && recap.topRoute.count > 1) {
+      const { item, count } = recap.topRoute;
+      list.push({
+        label: 'Most flown route',
+        value: route(item.from, item.to, '↔'),
+        detail: `${count} times`,
+      });
+    }
+    if (recap.topAirport) {
+      const { item, count } = recap.topAirport;
+      list.push({
+        label: 'Most visited airport',
+        value: airportCode(item),
+        detail: `${airportPlace(item)} · ${count} ${pluralize(count, 'visit')}`,
+      });
+    }
+    if (recap.topAirline) {
+      const { item, count } = recap.topAirline;
+      list.push({
+        label: 'Top airline',
+        value: item.name,
+        detail: `${count} of ${recap.flights} flights`,
+      });
+    }
+    if (recap.topAircraft) {
+      const { item, count } = recap.topAircraft;
+      list.push({
+        label: 'Top aircraft',
+        value: item,
+        detail: `${count} ${pluralize(count, 'flight')}`,
+      });
+    }
+    if (recap.busiestMonth && recap.flights > 2) {
+      const { item, count } = recap.busiestMonth;
+      list.push({
+        label: 'Busiest month',
+        value: MONTHS[item] ?? '',
+        detail: `${count} ${pluralize(count, 'flight')}`,
+      });
+    }
+    const seat = favourite(recap.seats);
+    const cabin = favourite(recap.classes);
+    if (seat || cabin) {
+      list.push({
+        label: 'Usual seat',
+        value: [seat?.label, cabin?.label].filter(Boolean).join(', '),
+        detail: [
+          seat ? `${seat.share}% ${seat.label.toLowerCase()}` : null,
+          cabin ? `${cabin.share}% ${cabin.label.toLowerCase()}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      });
+    }
+    return list;
+  });
+
+  const firsts = $derived(
+    recap
+      ? [
+          { label: 'Airports', items: recap.newAirports.map(airportCode) },
+          { label: 'Airlines', items: recap.newAirlines.map((a) => a.name) },
+          { label: 'Aircraft', items: recap.newAircraft },
+        ].filter((group) => group.items.length)
+      : [],
+  );
+
   let shareCard = $state<SVGSVGElement>();
   let exporting = $state(false);
   const download = async () => {
     if (!shareCard || !recap) return;
     exporting = true;
     try {
-      await downloadSvgAsPng(shareCard, `airtrail-passport-${recap.year}.png`);
+      await downloadSvgAsPng(shareCard, `airtrail-${recap.year}.png`);
     } catch (error) {
       console.error(error);
       toast.error('Could not create the image');
@@ -140,67 +219,68 @@
   };
 </script>
 
+{#snippet total(label: string, value: string, sub: string | null)}
+  <div class="min-w-0 border-b py-3">
+    <div class="text-[13px] text-muted-foreground">{label}</div>
+    <div
+      class="mt-0.5 whitespace-nowrap text-xl font-bold tracking-tight lg:text-[26px]"
+    >
+      {value}
+    </div>
+    <div class="truncate text-[13px] text-muted-foreground">
+      {sub ?? ' '}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet section(title: string, body: Snippet)}
+  <section
+    class="grid gap-3 border-b py-5 last:border-b-0 lg:grid-cols-[136px_minmax(0,1fr)] lg:gap-4"
+  >
+    <h3
+      class="text-lg font-bold tracking-tight lg:text-[15px] lg:font-semibold"
+    >
+      {title}
+    </h3>
+    <div class="min-w-0">{@render body()}</div>
+  </section>
+{/snippet}
+
 <svelte:head>
   <title>{year ? `${year} recap` : 'Recap'} - AirTrail</title>
 </svelte:head>
 
 <div class="h-full overflow-y-auto">
-  <div class="mx-auto flex max-w-4xl flex-col gap-6 px-4 pb-36 pt-6 md:pt-10">
+  <div class="mx-auto max-w-5xl px-6 pb-36 pt-6 md:pt-10">
     {#if $rawFlights.isLoading}
       <div class="flex justify-center py-24 text-muted-foreground">
         <LoaderCircle class="animate-spin" />
       </div>
     {:else if !recap || year === null}
-      <div class="py-24 text-center">
-        <h1 class="font-serif text-3xl font-bold">No recap yet</h1>
-        <p class="mt-2 text-muted-foreground">
-          Your yearly passport appears once you have a completed flight.
+      <div class="max-w-md py-10">
+        <h1 class="text-3xl font-bold tracking-tight">Recap</h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Your yearly recap appears once you have a completed flight.
         </p>
       </div>
     {:else}
-      <!-- Cover -->
-      <section
-        class="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#1d2d50,#14213d_55%,#0a1222)] px-6 pb-8 pt-10 text-center text-[#e3c27a] shadow-xl ring-1 ring-[#e3c27a]/30 md:px-10"
-      >
-        <div
-          class="pointer-events-none absolute inset-3 rounded-[22px] border border-[#e3c27a]/40"
-        ></div>
-        <svg
-          viewBox="-60 -60 120 120"
-          class="mx-auto size-20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-          aria-hidden="true"
-        >
-          <circle r="54" />
-          <ellipse rx="24" ry="54" />
-          <line x1="-54" x2="54" />
-          <path d="M -47 -27 Q 0 -14 47 -27 M -47 27 Q 0 14 47 27" />
-        </svg>
-        <p class="mt-3 text-xs font-semibold tracking-[0.45em]">
-          FLIGHT PASSPORT
-        </p>
-        <div class="mt-2 flex items-center justify-center gap-2 md:gap-6">
+      <header class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
-            class="text-[#e3c27a] hover:bg-white/10 hover:text-[#f1d999] disabled:opacity-20"
             disabled={yearIndex >= years.length - 1}
             onclick={() => selectYear(years[yearIndex + 1]!)}
             aria-label="Previous year"
           >
             <ChevronLeft />
           </Button>
-          <h1
-            class="font-serif text-7xl font-bold tabular-nums tracking-tight md:text-9xl"
-          >
+          <h1 class="text-3xl font-bold tracking-tight tabular-nums">
             {recap.year}
           </h1>
           <Button
             variant="ghost"
             size="icon"
-            class="text-[#e3c27a] hover:bg-white/10 hover:text-[#f1d999] disabled:opacity-20"
             disabled={yearIndex <= 0}
             onclick={() => selectYear(years[yearIndex - 1]!)}
             aria-label="Next year"
@@ -208,320 +288,150 @@
             <ChevronRight />
           </Button>
         </div>
-        <p class="mt-1 text-lg text-[#f3ead6]/85">{name}</p>
-        {#if recap.upcomingFlights}
-          <p class="mt-2 text-sm text-[#f3ead6]/60">
-            So far — {recap.upcomingFlights} more
-            {recap.upcomingFlights === 1 ? 'flight' : 'flights'} booked this year
-          </p>
-        {/if}
-      </section>
+        <Button variant="outline" onclick={download} disabled={exporting}>
+          {#if exporting}
+            <LoaderCircle size={16} class="animate-spin" />
+          {:else}
+            <Download size={16} />
+          {/if}
+          Download image
+        </Button>
+      </header>
+      <p class="mt-1 text-sm text-muted-foreground">
+        {subtitle}
+      </p>
 
-      <!-- Data page -->
-      <section class="passport-page rounded-[24px] p-6 shadow-md md:p-8">
-        <p class="page-label">Holder's record</p>
-        <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4">
-          {#each [{ label: 'Flights', value: recap.flights.toLocaleString() }, { label: `Distance (${unit})`, value: distance(recap.distanceKm) }, { label: 'Time aloft', value: duration(recap.durationSeconds) }, { label: 'Days flying', value: recap.daysFlying.toLocaleString() }, { label: 'Airports', value: recap.airports.toLocaleString() }, { label: 'Countries', value: recap.countries.toLocaleString() }, { label: 'Airlines', value: recap.airlines.toLocaleString() }, { label: 'Aircraft types', value: recap.aircraftTypes.toLocaleString() }] as stat (stat.label)}
-            <div>
-              <dt class="field-label">{stat.label}</dt>
-              <dd
-                class="font-serif text-3xl font-bold tabular-nums md:text-4xl"
-              >
-                {stat.value}
+      <div class="mt-3 grid grid-cols-2 gap-x-6 sm:grid-cols-4">
+        {@render total(
+          'Flights',
+          recap.flights.toLocaleString(),
+          flightsChange,
+        )}
+        {@render total(
+          'Distance',
+          `${distance(recap.distanceKm)} ${unit}`,
+          laps >= 0.1 ? `${round(laps, 1)}× around Earth` : null,
+        )}
+        {@render total(
+          'Duration',
+          duration(recap.durationSeconds),
+          `${recap.daysFlying} ${pluralize(recap.daysFlying, 'day')} flying`,
+        )}
+        {@render total('Routes', recap.routes.toLocaleString(), null)}
+        {@render total(
+          'Airports',
+          recap.airports.toLocaleString(),
+          newCount(recap.newAirports.length),
+        )}
+        {@render total(
+          'Countries',
+          recap.countries.toLocaleString(),
+          newCount(recap.newCountries.length),
+        )}
+        {@render total(
+          'Airlines',
+          recap.airlines.toLocaleString(),
+          newCount(recap.newAirlines.length),
+        )}
+        {@render total(
+          'Aircraft types',
+          recap.aircraftTypes.toLocaleString(),
+          newCount(recap.newAircraft.length),
+        )}
+      </div>
+
+      {#snippet monthsBody()}
+        <ColumnChart data={months} testId="recap-per-month" />
+      {/snippet}
+      {@render section('Per month', monthsBody)}
+
+      {#snippet highlightsBody()}
+        <dl class="grid grid-cols-2 gap-x-7 gap-y-4 lg:grid-cols-4">
+          {#each highlights as highlight (highlight.label)}
+            <div class="min-w-0">
+              <dt class="text-[13px] text-muted-foreground">
+                {highlight.label}
+              </dt>
+              <dd class="truncate font-semibold">{highlight.value}</dd>
+              <dd class="truncate text-[13px] text-muted-foreground">
+                {highlight.detail}
               </dd>
             </div>
           {/each}
         </dl>
+      {/snippet}
+      {#if highlights.length}
+        {@render section('Highlights', highlightsBody)}
+      {/if}
 
-        <p class="mt-6 font-serif text-lg italic text-[#5d5546]">
-          {#if laps >= 0.1}
-            That's {laps.toFixed(laps >= 10 ? 0 : 1)}× around the Earth, or {(
-              moon * 100
-            ).toFixed(moon >= 0.1 ? 0 : 1)}% of the way to the Moon.
-          {:else}
-            {recap.routes}
-            {recap.routes === 1 ? 'route' : 'routes'} flown this year.
-          {/if}
-          {#if change(recap.flights, recap.previousYearFlights)}
-            <span class="not-italic">
-              · {change(recap.flights, recap.previousYearFlights)}
-              {recap.year - 1} in flights
-            </span>
-          {/if}
-        </p>
-
-        <div class="mt-6" aria-label="Flights per month">
-          <div class="flex h-20 items-end gap-1.5">
-            {#each recap.flightsPerMonth as count, month (month)}
-              <div
-                class="flex-1 rounded-t-sm bg-[#1d4e89]/80"
-                style:height="{(count / monthMax) * 100}%"
-                style:min-height={count ? '4px' : '1px'}
-                title="{MONTHS[month]}: {count}"
-              ></div>
-            {/each}
-          </div>
-          <div
-            class="mt-1 flex gap-1.5 font-mono text-[10px] uppercase text-[#7a705c]"
-          >
-            {#each MONTHS as month (month)}
-              <span class="flex-1 text-center">{month[0]}</span>
-            {/each}
-          </div>
-        </div>
-
-        {#if mrz}
-          <div
-            class="mt-6 overflow-x-auto border-t border-dashed border-[#bfb294] pt-4 font-mono text-[11px] leading-relaxed tracking-[0.18em] text-[#3d3a33] md:text-sm"
-            aria-hidden="true"
-          >
-            <div class="whitespace-pre">{mrz[0]}</div>
-            <div class="whitespace-pre">{mrz[1]}</div>
-          </div>
-        {/if}
-      </section>
-
-      <!-- Stamps -->
-      {#if recap.stamps.length}
-        <section class="passport-page rounded-[24px] p-6 shadow-md md:p-8">
-          <div class="flex items-baseline justify-between gap-4">
-            <p class="page-label">Entries</p>
-            <p class="text-sm text-[#7a705c]">
-              {entriesLabel}
-            </p>
-          </div>
-          <div
-            class="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
-          >
-            {#each recap.stamps as stamp (stamp.country)}
-              <PassportStamp
-                seed={stamp.country}
-                country={countryName(stamp.country)}
-                code={airportCode(stamp.airport)}
-                date={stampDate(stamp.date)}
-                isNew={stamp.isNew}
-                class="w-full mix-blend-multiply"
+      {#snippet countriesBody()}
+        <ul class="grid gap-x-7 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+          {#each recap.countryVisits as visit (visit.country)}
+            <li class="flex min-w-0 items-center gap-3 py-1.5">
+              <img
+                src="https://flagcdn.com/{visit.country.toLowerCase()}.svg"
+                alt=""
+                class="h-5 w-7 shrink-0 rounded-sm object-cover shadow-sm"
               />
-            {/each}
-          </div>
-        </section>
-      {/if}
-
-      <!-- Highlights -->
-      <section class="grid gap-4 md:grid-cols-2">
-        {#if recap.longestFlight}
-          {@const flight = recap.longestFlight}
-          <article class="highlight">
-            <p class="field-label">Longest flight</p>
-            <p class="route">
-              {airportCode(flight.from)} → {airportCode(flight.to)}
-            </p>
-            <p class="detail">
-              {airportPlace(flight.from)} to {airportPlace(flight.to)} ·
-              {distance(flight.distanceKm)}
-              {unit}{#if flight.durationSeconds}
-                · {duration(flight.durationSeconds)}{/if}
-            </p>
-          </article>
-        {/if}
-        {#if recap.shortestFlight}
-          {@const flight = recap.shortestFlight}
-          <article class="highlight">
-            <p class="field-label">Shortest hop</p>
-            <p class="route">
-              {airportCode(flight.from)} → {airportCode(flight.to)}
-            </p>
-            <p class="detail">
-              {airportPlace(flight.from)} to {airportPlace(flight.to)} ·
-              {distance(flight.distanceKm)}
-              {unit}
-            </p>
-          </article>
-        {/if}
-        {#if recap.topRoute && recap.topRoute.count > 1}
-          <article class="highlight">
-            <p class="field-label">Most flown route</p>
-            <p class="route">
-              {airportCode(recap.topRoute.item.from)} ↔ {airportCode(
-                recap.topRoute.item.to,
-              )}
-            </p>
-            <p class="detail">{recap.topRoute.count} times</p>
-          </article>
-        {/if}
-        {#if recap.topAirport}
-          <article class="highlight">
-            <p class="field-label">Home base</p>
-            <p class="route">{airportCode(recap.topAirport.item)}</p>
-            <p class="detail">
-              {recap.topAirport.item.name} · {recap.topAirport.count} visits
-            </p>
-          </article>
-        {/if}
-        {#if recap.topAirline}
-          <article class="highlight">
-            <p class="field-label">Favourite airline</p>
-            <p class="route">{recap.topAirline.item.name}</p>
-            <p class="detail">
-              {recap.topAirline.count} of {recap.flights} flights
-            </p>
-          </article>
-        {/if}
-        {#if recap.topAircraft}
-          <article class="highlight">
-            <p class="field-label">Most flown aircraft</p>
-            <p class="route">{recap.topAircraft.item}</p>
-            <p class="detail">{recap.topAircraft.count} flights</p>
-          </article>
-        {/if}
-        {#if recap.busiestMonth && recap.flights > 2}
-          <article class="highlight">
-            <p class="field-label">Busiest month</p>
-            <p class="route">{MONTHS[recap.busiestMonth.item]}</p>
-            <p class="detail">{recap.busiestMonth.count} flights</p>
-          </article>
-        {/if}
-        {#if favourite(recap.seats) || favourite(recap.classes)}
-          {@const seat = favourite(recap.seats)}
-          {@const cabin = favourite(recap.classes)}
-          <article class="highlight">
-            <p class="field-label">Your seat</p>
-            <p class="route">
-              {[seat?.label, cabin?.label].filter(Boolean).join(' · ')}
-            </p>
-            <p class="detail">
-              {[
-                seat ? `${seat.share}% ${seat.label.toLowerCase()}` : null,
-                cabin ? `${cabin.share}% ${cabin.label.toLowerCase()}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          </article>
-        {/if}
-      </section>
-
-      <!-- Firsts -->
-      {#if recap.newAirports.length || recap.newAirlines.length || recap.newAircraft.length}
-        <section class="highlight">
-          <p class="field-label">Firsts this year</p>
-          <dl class="mt-3 space-y-3 text-sm">
-            {#each [{ label: 'Airports', items: recap.newAirports.map( (airport) => airportCode(airport) ) }, { label: 'Countries', items: recap.newCountries.map(countryName) }, { label: 'Airlines', items: recap.newAirlines.map((airline) => airline.name) }, { label: 'Aircraft', items: recap.newAircraft }].filter((group) => group.items.length) as group (group.label)}
-              <div class="flex flex-col gap-1.5 md:flex-row md:gap-4">
-                <dt class="w-24 shrink-0 text-muted-foreground">
-                  {group.label}
-                  <span class="tabular-nums">({group.items.length})</span>
-                </dt>
-                <dd class="flex flex-wrap gap-1.5">
-                  {#each group.items as item (item)}
-                    <span
-                      class="rounded-full border bg-background px-2 py-0.5 text-xs"
-                      >{item}</span
-                    >
-                  {/each}
-                </dd>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="truncate text-sm font-medium">
+                    {countryName(visit.country)}
+                  </span>
+                  {#if visit.isNew}
+                    <Badge variant="secondary">New</Badge>
+                  {/if}
+                </div>
+                <div class="truncate text-[13px] text-muted-foreground">
+                  {[airportCode(visit.airport), shortDate(visit.date)]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
               </div>
-            {/each}
-          </dl>
-        </section>
+            </li>
+          {/each}
+        </ul>
+      {/snippet}
+      {#if recap.countryVisits.length}
+        {@render section('Countries', countriesBody)}
       {/if}
 
-      <!-- Share -->
-      {#if mrz}
-        <section class="highlight">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p class="field-label">Share</p>
-              <p class="text-sm text-muted-foreground">
-                A 1080 × 1350 image of your {recap.year} passport.
-              </p>
+      {#snippet firstsBody()}
+        <dl class="space-y-3">
+          {#each firsts as group (group.label)}
+            <div class="flex flex-col gap-1.5 sm:flex-row sm:gap-4">
+              <dt class="w-24 shrink-0 text-[13px] text-muted-foreground">
+                {group.label}
+              </dt>
+              <dd class="flex flex-wrap gap-1.5">
+                {#each group.items as item (item)}
+                  <Badge variant="outline">{item}</Badge>
+                {/each}
+              </dd>
             </div>
-            <Button onclick={download} disabled={exporting}>
-              {#if exporting}
-                <LoaderCircle size={16} class="mr-2 animate-spin" />
-              {:else}
-                <Download size={16} class="mr-2" />
-              {/if}
-              Download image
-            </Button>
-          </div>
-          <div
-            class="mx-auto mt-4 w-full max-w-sm overflow-hidden rounded-xl shadow-lg"
-          >
-            <RecapShareCard
-              bind:svg={shareCard}
-              {recap}
-              {name}
-              {mrz}
-              distance={distance(recap.distanceKm)}
-              distanceUnit={unit}
-              timeAloft={duration(recap.durationSeconds)}
-            />
-          </div>
-        </section>
+          {/each}
+        </dl>
+      {/snippet}
+      {#if firsts.length}
+        {@render section('First time', firstsBody)}
       {/if}
+
+      {#snippet shareBody()}
+        <p class="text-sm text-muted-foreground">
+          A 1080 × 1350 image of this page, for sharing.
+        </p>
+        <div class="mt-3 w-full max-w-xs overflow-hidden rounded-lg border">
+          <RecapShareCard
+            bind:svg={shareCard}
+            {recap}
+            {name}
+            distance={distance(recap.distanceKm)}
+            distanceUnit={unit}
+            timeAloft={duration(recap.durationSeconds)}
+          />
+        </div>
+      {/snippet}
+      {@render section('Share', shareBody)}
     {/if}
   </div>
 </div>
-
-<style>
-  .passport-page {
-    color: #2b2a28;
-    background-color: #f5efe0;
-    background-image:
-      radial-gradient(
-        circle at 0 0,
-        transparent 15px,
-        #d9cdb155 16px,
-        transparent 17px
-      ),
-      radial-gradient(
-        circle at 18px 18px,
-        transparent 15px,
-        #d9cdb155 16px,
-        transparent 17px
-      );
-    background-size: 36px 36px;
-  }
-
-  .page-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: #7a705c;
-  }
-
-  .field-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #7a705c;
-  }
-
-  :global(.dark) .highlight .field-label {
-    color: var(--muted-foreground);
-  }
-
-  .highlight {
-    border-radius: 1.25rem;
-    border: 1px solid var(--border);
-    background: var(--card);
-    padding: 1.25rem 1.5rem;
-  }
-
-  .route {
-    margin-top: 0.35rem;
-    font-family: ui-serif, Georgia, serif;
-    font-size: 1.6rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .detail {
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    color: var(--muted-foreground);
-  }
-</style>

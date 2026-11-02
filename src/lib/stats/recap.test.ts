@@ -1,7 +1,7 @@
 import { TZDate } from '@date-fns/tz';
 import { describe, expect, it } from 'vitest';
 
-import { computeYearRecap, machineReadableZone, recapYears } from './recap';
+import { computeYearRecap, recapYears } from './recap';
 
 import type { Airport, Flight } from '$lib/db/types';
 import type { FlightData } from '$lib/utils';
@@ -82,12 +82,12 @@ describe('computeYearRecap', () => {
     expect(recap.newCountries).toEqual(['GB']);
   });
 
-  it('stamps each country where it was first reached', () => {
+  it('lists each country where it was first reached', () => {
     expect(
-      recap.stamps.map((stamp) => [
-        stamp.country,
-        stamp.airport.iata,
-        stamp.isNew,
+      recap.countryVisits.map((visit) => [
+        visit.country,
+        visit.airport.iata,
+        visit.isNew,
       ]),
     ).toEqual([
       ['IN', 'BLR', false],
@@ -105,12 +105,5 @@ describe('computeYearRecap', () => {
 
   it('lists years with completed flights, newest first', () => {
     expect(recapYears(flights, now)).toEqual([2026, 2025]);
-  });
-
-  it('builds a 44-character machine-readable zone', () => {
-    const [first, second] = machineReadableZone('Krish Ā', recap);
-    expect(first).toBe('P<ATRKRISH<A<<2026'.padEnd(44, '<'));
-    expect(second.startsWith('3FLT<16200KM<3APT<3CTY')).toBe(true);
-    expect(second).toHaveLength(44);
   });
 });
